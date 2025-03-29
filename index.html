@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Quantum Cascade</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            touch-action: manipulation;
+            overscroll-behavior: contain;
+        }
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 1px;
+            background-color: #e0e0e0;
+        }
+        .block {
+            aspect-ratio: 1;
+            transition: all 0.1s ease;
+        }
+        .quantum-glow {
+            animation: quantum-pulse 2s infinite alternate;
+        }
+        @keyframes quantum-pulse {
+            0% { opacity: 0.7; }
+            100% { opacity: 1; transform: scale(1.02); }
+        }
+        .mobile-controls {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 10px;
+        }
+        .mobile-controls button {
+            touch-action: manipulation;
+            padding: 10px;
+            margin: 0 5px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            width: 50px;
+            height: 50px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen">
+    <div class="game-container w-full max-w-md px-4">
+        <h1 class="text-3xl font-bold text-center mb-4 text-blue-800">Quantum Cascade</h1>
+        <div id="game-board" class="game-grid bg-white"></div>
+        <div class="game-info mt-4 space-y-2 text-center">
+            <div class="text-lg">
+                <span class="font-bold">Score:</span> 
+                <span id="score">0</span>
+            </div>
+            <div class="text-lg">
+                <span class="font-bold">Energy:</span> 
+                <span id="energy">0</span>
+            </div>
+            <div id="game-status" class="text-red-500 font-bold"></div>
+        </div>
+        <div class="mobile-controls">
+            <button id="left-btn">←</button>
+            <button id="rotate-btn">↻</button>
+            <button id="right-btn">→</button>
+            <button id="down-btn">↓</button>
+        </div>
+    </div>
+
+    <script>
+        class QuantumCascade {
+            constructor() {
+                this.width = 10;
+                this.height = 20;
+                this.grid = Array(this.height).fill().map(() => Array(this.width).fill(0));
+                this.gameBoard = document.getElementById('game-board');
+                this.scoreElement = document.getElementById('score');
+                this.energyElement = document.getElementById('energy');
+                this.gameStatusElement = document.getElementById('game-status');
+                
+                this.score = 0;
+                this.energy = 0;
+                this.gameOver = false;
+
+                this.quantumShapes = [
+                    {
+                        name: 'Line Block',
+                        shape: [
+                            [1, 1, 1, 1]
+                        ],
+                        color: 'bg-cyan-500',
+                        specialAbility: this.phaseShift.bind(this)
+                    },
+                    {
+                        name: 'Cleveland Z Block',
+                        shape: [
+                            [1, 1, 0],
+                            [0, 1, 1]
+                        ],
+                        color: 'bg-red-500',
+                        specialAbility: this.quantumLink.bind(this)
+                    },
+                    {
+                        name: 'Teewee Block',
+                        shape: [
+                            [0, 1, 0],
+                            [1, 1, 1]
+                        ],
+                        color: 'bg-purple-500',
+                        specialAbility: this.probabilityCollapse.bind(this)
+                    },
+                    {
+                        name: 'Square Block',
+                        shape: [
+                            [1, 1],
+                            [1, 1]
+                        ],
+                        color: 'bg-yellow-500',
+                        specialAbility: this.phaseShift.bind(this)
+                    },
+                    {
+                        name: 'Mirrored L Block',
+                        shape: [
+                            [0, 0, 1],
+                            [1, 1, 1]
+                        ],
+                        color: 'bg-orange-500',
+                        specialAbility: this.quantumLink.bind(this)
+                    }
+                ];
+
+                this.currentBlock = null;
+                this.currentPosition = { x: 0, y: 0 };
+
+                this.init();
+            }
+
+            init() {
+                this.renderGrid();
+                this.bindControls();
+                this.startGame();
+            }
+
+            renderGrid() {
+                this.gameBoard.innerHTML = '';
+                for (let y = 0; y < this.height; y++) {
+                    for (let x = 0; x < this.width; x++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('block', 'border', 'border-gray-200');
+                        if (this.grid[y][x]) {
+                            cell.classList.add('bg-blue-500');
+                        }
+                        this.gameBoard.appendChild(cell);
+                    }
+                }
+            }
+
+            startGame() {
+                this.generateNewBlock();
+                this.gameLoop = setInterval(() => {
+                    this.moveBlock(0, 1);
+                }, 500);
+            }
+
+            generateNewBlock() {
+                const shape = this.quantumShapes[Math.floor(Math.random() * this.quantumShapes.length)];
+                this.currentBlock = {
+                    ...shape,
+                    shape: shape.shape.map(row => [...row])
+                };
+                this.currentPosition = { 
+                    x: Math.floor(this.width / 2) - Math.floor(this.currentBlock.shape[0].length / 2), 
+                    y: 0 
+                };
+
+                if (this.checkCollision()) {
+                    this.endGame();
+                }
+
+                this.renderCurrentBlock();
+            }
+
+            renderCurrentBlock() {
+                this.renderGrid();
+                this.currentBlock.shape.forEach((row, dy) => {
+                    row.forEach((cell, dx) => {
+                        if (cell) {
+                            const index = (this.currentPosition.y + dy) * this.width + (this.currentPosition.x + dx);
+                            const blockElement = this.gameBoard.children[index];
+                            blockElement.classList.add(this.currentBlock.color, 'quantum-glow');
+                        }
+                    });
+                });
+            }
+
+            moveBlock(dx, dy) {
+                this.currentPosition.x += dx;
+                this.currentPosition.y += dy;
+
+                if (this.checkCollision()) {
+                    this.currentPosition.x -= dx;
+                    this.currentPosition.y -= dy;
+                    
+                    if (dy > 0) {
+                        this.lockBlock();
+                    }
+                    return false;
+                }
+
+                this.renderCurrentBlock();
+                return true;
+            }
+
+            checkCollision() {
+                return this.currentBlock.shape.some((row, dy) => 
+                    row.some((cell, dx) => {
+                        if (!cell) return false;
+                        
+                        const newX = this.currentPosition.x + dx;
+                        const newY = this.currentPosition.y + dy;
+
+                        return (
+                            newX < 0 || 
+                            newX >= this.width || 
+                            newY >= this.height || 
+                            (this.grid[newY] && this.grid[newY][newX])
+                        );
+                    })
+                );
+            }
+
+            lockBlock() {
+                this.currentBlock.shape.forEach((row, dy) => {
+                    row.forEach((cell, dx) => {
+                        if (cell) {
+                            const x = this.currentPosition.x + dx;
+                            const y = this.currentPosition.y + dy;
+                            if (y >= 0) {
+                                this.grid[y][x] = 1;
+                            }
+                        }
+                    });
+                });
+
+                this.clearLines();
+                this.generateNewBlock();
+                this.updateScore(10);
+            }
+
+            clearLines() {
+                let linesCleared = 0;
+                for (let y = this.height - 1; y >= 0; y--) {
+                    if (this.grid[y].every(cell => cell)) {
+                        this.grid.splice(y, 1);
+                        this.grid.unshift(Array(this.width).fill(0));
+                        linesCleared++;
+                        y++;
+                    }
+                }
+
+                if (linesCleared > 0) {
+                    this.updateScore(linesCleared * 100);
+                    this.updateEnergy(linesCleared * 10);
+                }
+            }
+
+            rotateBlock() {
+                const rotated = this.currentBlock.shape[0].map((val, index) => 
+                    this.currentBlock.shape.map(row => row[index]).reverse()
+                );
+
+                const originalShape = this.currentBlock.shape;
+                this.currentBlock.shape = rotated;
+
+                if (this.checkCollision()) {
+                    this.currentBlock.shape = originalShape;
+                    return false;
+                }
+
+                this.renderCurrentBlock();
+                return true;
+            }
+
+            updateScore(points) {
+                this.score += points;
+                this.scoreElement.textContent = this.score;
+            }
+
+            updateEnergy(points) {
+                this.energy += points;
+                this.energyElement.textContent = this.energy;
+            }
+
+            // Quantum Special Abilities
+            phaseShift() {
+                if (this.energy >= 50) {
+                    // Temporarily allow passing through blocks
+                    console.log('Phase Shift Activated');
+                    this.energy -= 50;
+                    this.energyElement.textContent = this.energy;
+                }
+            }
+
+            quantumLink() {
+                if (this.energy >= 75) {
+                    // Link nearby blocks
+                    console.log('Quantum Link Activated');
+                    this.energy -= 75;
+                    this.energyElement.textContent = this.energy;
+                }
+            }
+
+            probabilityCollapse() {
+                if (this.energy >= 100) {
+                    // Randomly transform surrounding blocks
+                    console.log('Probability Collapse Activated');
+                    this.energy -= 100;
+                    this.energyElement.textContent = this.energy;
+                }
+            }
+
+            endGame() {
+                clearInterval(this.gameLoop);
+                this.gameOver = true;
+                this.gameStatusElement.textContent = 'GAME OVER';
+            }
+
+            bindControls() {
+                // Keyboard controls
+                document.addEventListener('keydown', (e) => {
+                    if (this.gameOver) return;
+
+                    switch(e.key) {
+                        case 'ArrowLeft':
+                            this.moveBlock(-1, 0);
+                            break;
+                        case 'ArrowRight':
+                            this.moveBlock(1, 0);
+                            break;
+                        case 'ArrowDown':
+                            this.moveBlock(0, 1);
+                            break;
+                        case 'ArrowUp':
+                            this.rotateBlock();
+                            break;
+                        case ' ':
+                            this.currentBlock.specialAbility();
+                            break;
+                    }
+                });
+
+                // Mobile controls
+                document.getElementById('left-btn').addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.moveBlock(-1, 0);
+                });
+
+                document.getElementById('right-btn').addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.moveBlock(1, 0);
+                });
+
+                document.getElementById('down-btn').addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.moveBlock(0, 1);
+                });
+
+                document.getElementById('rotate-btn').addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.rotateBlock();
+                });
+            }
+        }
+
+        // Initialize the game
+        new QuantumCascade();
+    </script>
+</body>
+</html>
